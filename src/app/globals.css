@@ -1,0 +1,67 @@
+@import "tailwindcss";
+
+@theme {
+  /* Precision CogniFlow Palette - Derived from Images */
+  --color-cogni-bg: #090B13;
+  /* Deep Obsidian Background */
+  --color-cogni-card: #0D101A;
+  /* Primary Card Surface */
+  --color-cogni-card-muted: #111421;
+  /* Sidebar / Receipt Side Panel */
+  --color-cogni-border: #1E253A;
+  /* Precise Border Stroke */
+
+  /* Accent: CogniFlow Cyan */
+  --color-cogni-cyan: #22D3EE;
+  --color-cogni-cyan-glow: rgba(34, 211, 238, 0.3);
+
+  /* Text Layers */
+  --color-cogni-text-main: #FFFFFF;
+  --color-cogni-text-muted: #4B5563;
+  /* The specific dark gray for labels */
+  --color-cogni-text-dim: #374151;
+  /* For placeholder/disabled states */
+
+  /* Spacing & Radius */
+  --radius-cogni: 24px;
+  /* Large rounded corners for modals */
+  --radius-cogni-inner: 12px;
+  /* Tighter radius for inputs/tabs */
+}
+
+/* Base resets to match the visual weight of the screenshots */
+@layer base {
+  body {
+    @apply bg-cogni-bg text-white antialiased selection:bg-cogni-cyan/30;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Custom Scrollbar for the dark interface */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-cogni-bg);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-cogni-border);
+    border-radius: 10px;
+  }
+}
+
+/* Exact Design Utilities */
+@layer utilities {
+  .glass-morph {
+    @apply backdrop-blur-md bg-black/80 border border-white/5;
+  }
+
+  .cogni-button-glow {
+    box-shadow: 0 20px 40px -10px var(--color-cogni-cyan-glow);
+  }
+
+  .cogni-input {
+    @apply bg-[#090B13] border-[#1E253A] rounded-xl px-5 py-4 text-white placeholder:text-[#1E253A] focus:border-cogni-cyan/50 focus:ring-4 focus:ring-cogni-cyan/5 outline-none transition-all;
+  }
+}
