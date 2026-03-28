@@ -22,7 +22,7 @@ interface PlanInfo {
 
 interface PaymentConfig {
   reference: string;
-  email: string;
+  email?: string;
   amount: number;
   currency: string;
   publicKey: string;
@@ -289,10 +289,9 @@ export default function PaymentCheckoutPage() {
 
   // Load plan from localStorage on mount
   useEffect(() => {
-    const mockUser = localStorage.getItem('cogniflow_mock_user');
     const onboardingCompleted = localStorage.getItem('onboarding_completed');
     
-    if (!mockUser || !onboardingCompleted) {
+    if (!onboardingCompleted) {
       router.push('/login');
       return;
     }
@@ -363,6 +362,18 @@ export default function PaymentCheckoutPage() {
   }, []);
 
   const handlePayment = async () => {
+    // Handle free tier - skip payment processing
+    if (planInfo?.tier.toLowerCase() === 'free') {
+      setIsProcessing(true);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      localStorage.setItem('payment_completed', 'true');
+      localStorage.setItem('payment_reference', reference);
+      localStorage.setItem('subscription_tier', 'free');
+      localStorage.setItem('subscription_status', 'active');
+      router.push('/dashboard');
+      return;
+    }
+
     if (!isPaystackConfigured) {
       // Demo mode
       setIsProcessing(true);

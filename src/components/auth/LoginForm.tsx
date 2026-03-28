@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, Globe, Apple, Eye, EyeOff, LayoutGrid, Zap } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { useAuth } from '@/hooks/useAuth';
+import { isSupabaseConfigured } from '@/lib/supabaseClient';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -13,6 +15,9 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  
+  const { signIn } = useAuth();
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,24 +31,31 @@ export function LoginForm() {
       return;
     }
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { error: signInError } = await signIn(email, password);
 
-    // Handle rate limit errors (429) from Supabase
-    if (signInError) {
-      setError(signInError.message || 'Login failed. Please try again.');
+      // Handle rate limit errors (429) from Supabase
+      if (signInError) {
+        setError(signInError.message || 'Login failed. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      // Supabase login success
+      setMessage('Authorization successful. Synchronizing...');
+      
+      // Use Next.js router for client-side navigation
+      // This ensures proper state management and avoids full page reload
+      setTimeout(() => {
+        router.push('/dashboard');
+        router.refresh(); // Refresh to ensure server components update
+      }, 1000);
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(errorMessage);
       setLoading(false);
-      return;
     }
-
-    // Supabase login success
-    setMessage('Authorization successful. Synchronizing...');
-    setTimeout(() => {
-      window.location.href = '/dashboard';
-    }, 1500);
-    setLoading(false);
   };
 
   return (

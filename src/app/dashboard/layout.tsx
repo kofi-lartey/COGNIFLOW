@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function DashboardLayout({
   children,
@@ -12,6 +13,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { user, loading: authLoading } = useAuth();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -22,17 +24,21 @@ export default function DashboardLayout({
   useEffect(() => {
     // Check authentication and onboarding status
     const checkAuth = async () => {
-      // Check for mock auth or Supabase auth
-      const mockUser = localStorage.getItem('cogniflow_mock_user');
-      const onboardingCompleted = localStorage.getItem('onboarding_completed');
+      // Wait for auth to finish loading
+      if (authLoading) {
+        return;
+      }
 
-      if (!mockUser) {
+      // Check for Supabase auth
+      if (!user) {
         // Not authenticated - redirect to login
         router.push('/login');
         return;
       }
 
       // Check onboarding completion
+      const onboardingCompleted = localStorage.getItem('onboarding_completed');
+      
       // For demo mode, we consider onboarding complete if the flag is set
       // In production, you'd check the user profile from the database
       if (!onboardingCompleted && pathname !== '/onboarding') {
@@ -45,7 +51,7 @@ export default function DashboardLayout({
     };
 
     checkAuth();
-  }, [router, pathname]);
+  }, [router, pathname, user, authLoading]);
 
   // Show loading state
   if (isLoading) {

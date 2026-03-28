@@ -2,12 +2,13 @@
 import React, { useState, useCallback } from 'react';
 import {
     Search, Bell, Activity,
-    FileText, MoreHorizontal, Settings
+    FileText, MoreHorizontal, Settings, MessageSquare
 } from 'lucide-react';
 import FileUploader, { FileMetadata } from '@/components/upload/FileUploader';
 import CognitiveEngineModal, { ProcessingState } from '@/components/modals/CognitiveEngineModal';
 import NeuralActivityTable from '@/components/neural/NeuralActivityTable';
 import SystemHealth from '@/components/neural/SystemHealth';
+import AIChat from '@/components/ai/AIChat';
 import { useNeuralProcessor } from '@/hooks/useNeuralProcessor';
 import type { NeuralFileItem } from '@/hooks/useNeuralProcessor';
 
@@ -244,6 +245,26 @@ export default function CommandCenter() {
                             maxDisplay={10}
                             showFilters={true}
                         />
+                    </div>
+
+                    {/* AI ASSISTANT CHAT */}
+                    <div className="col-span-12">
+                        <div className="bg-[#0D1628] border border-[#1E293B] rounded-xl overflow-hidden">
+                            <div className="flex items-center gap-3 px-6 py-4 border-b border-[#1E293B]">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
+                                    <MessageSquare className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">AI Assistant</h3>
+                                    <p className="text-xs text-[#6B7280]">
+                                        Ask questions about your uploaded documents
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="h-[500px]">
+                                <AIChat />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

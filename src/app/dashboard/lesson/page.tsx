@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Play, Pause, ChevronRight, ChevronLeft, BookOpen, 
   Video, FileText, Download, Bookmark, BookmarkCheck,

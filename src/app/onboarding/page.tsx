@@ -50,10 +50,6 @@ export default function OnboardingPage() {
     saveData({ tier });
 
     try {
-      // Get auth token from localStorage (set by mock auth)
-      const mockUser = localStorage.getItem('cogniflow_mock_user');
-      const token = mockUser ? JSON.parse(mockUser).id : null;
-
       // For all tiers, redirect to payment checkout
       // Free tier will have no charge, paid tiers will process payment
       localStorage.setItem('onboarding_completed', 'true');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -24,10 +24,17 @@ export function useAuth(): UseAuthReturn {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Ref to track if component is mounted (React 19 best practice)
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mountedRef.current) return;
+      
       setSession(session);
       if (session?.user) {
         setUser({
@@ -41,6 +48,8 @@ export function useAuth(): UseAuthReturn {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mountedRef.current) return;
+      
       setSession(session);
       if (session?.user) {
         setUser({
@@ -54,7 +63,11 @@ export function useAuth(): UseAuthReturn {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Cleanup function (React 19 compatible)
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {

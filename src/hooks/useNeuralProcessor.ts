@@ -5,6 +5,11 @@
  * connecting to the Command Center and Recent Vault Activity table.
  * 
  * Handles status transitions: FETCHING -> VECTORIZING -> ANALYZING -> COMPLETE
+ * 
+ * React 19 Compatible:
+ * - Uses mountedRef to prevent state updates after unmount
+ * - Proper cleanup in useEffect hooks
+ * - Disposal mechanism for processor resources
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
@@ -60,6 +65,11 @@ const DEFAULT_OPTIONS: ProcessingOptions = {
 
 /**
  * useNeuralProcessor - Main hook for neural processing state management
+ * 
+ * React 19 Compatible:
+ * - Proper cleanup in useEffect hooks
+ * - mountedRef to prevent state updates after unmount
+ * - Disposal mechanism for processor resources
  */
 export function useNeuralProcessor() {
   // State
@@ -74,16 +84,32 @@ export function useNeuralProcessor() {
   // Refs
   const processorRef = useRef<ProcessorService | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
   
-  // Initialize processor
+  // Initialize processor (React 19 compatible)
   useEffect(() => {
+    mountedRef.current = true;
+    
     processorRef.current = new ProcessorService({
       persona: DEFAULT_OPTIONS.persona,
       maxSummaryLength: 150
     });
     
+    // Cleanup function (React 19 best practice)
     return () => {
-      processorRef.current?.terminate();
+      mountedRef.current = false;
+      
+      // Terminate processor to prevent memory leaks
+      if (processorRef.current) {
+        processorRef.current.terminate();
+        processorRef.current = null;
+      }
+      
+      // Abort any ongoing processing
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
     };
   }, []);
   
@@ -107,7 +133,9 @@ export function useNeuralProcessor() {
       uploadedAt: new Date().toISOString()
     };
     
-    setFiles(prev => [newFile, ...prev]);
+    if (mountedRef.current) {
+      setFiles(prev => [newFile, ...prev]);
+    }
     return id;
   }, []);
   
@@ -118,24 +146,30 @@ export function useNeuralProcessor() {
     fileId: string,
     updates: Partial<NeuralFileItem>
   ) => {
-    setFiles(prev => prev.map(f => 
-      f.id === fileId ? { ...f, ...updates } : f
-    ));
+    if (mountedRef.current) {
+      setFiles(prev => prev.map(f => 
+        f.id === fileId ? { ...f, ...updates } : f
+      ));
+    }
   }, []);
   
   /**
    * Remove a file
    */
   const removeFile = useCallback((fileId: string) => {
-    setFiles(prev => prev.filter(f => f.id !== fileId));
+    if (mountedRef.current) {
+      setFiles(prev => prev.filter(f => f.id !== fileId));
+    }
   }, []);
   
   /**
    * Clear all files
    */
   const clearFiles = useCallback(() => {
-    setFiles([]);
-    setCurrentFile(null);
+    if (mountedRef.current) {
+      setFiles([]);
+      setCurrentFile(null);
+    }
   }, []);
   
   // ============================================
@@ -154,27 +188,48 @@ export function useNeuralProcessor() {
     if (!file) return;
     
     const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-    setIsProcessing(true);
-    setCurrentFile(file);
-    setError(null);
+    
+    // Create abort controller for this processing session
+    abortControllerRef.current = new AbortController();
+    
+    if (mountedRef.current) {
+      setIsProcessing(true);
+      setCurrentFile(file);
+      setError(null);
+    }
     
     // Update processor config
     processorRef.current?.updateConfig({ persona: mergedOptions.persona });
     
     try {
       // Stage 1: FETCHING
-      setStatus('FETCHING');
-      setProgress(10);
-      setMessage('Fetching content from Vault...');
+      if (mountedRef.current) {
+        setStatus('FETCHING');
+        setProgress(10);
+        setMessage('Fetching content from Vault...');
+      }
       updateFileStatus(fileId, { status: 'FETCHING', progress: 10, message: 'Fetching content...' });
       
-      // Simulate fetch delay
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Simulate fetch delay (with abort check)
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(resolve, 500);
+        abortControllerRef.current?.signal.addEventListener('abort', () => {
+          clearTimeout(timeout);
+          reject(new Error('Processing aborted'));
+        });
+      });
+      
+      // Check if aborted
+      if (abortControllerRef.current?.signal.aborted) {
+        throw new Error('Processing aborted');
+      }
       
       // Stage 2: VECTORIZING
-      setStatus('VECTORIZING');
-      setProgress(30);
-      setMessage('Extracting and vectorizing text...');
+      if (mountedRef.current) {
+        setStatus('VECTORIZING');
+        setProgress(30);
+        setMessage('Extracting and vectorizing text...');
+      }
       updateFileStatus(fileId, { status: 'VECTORIZING', progress: 30, message: 'Vectorizing content...' });
       
       // Call ingest API
@@ -184,7 +239,8 @@ export function useNeuralProcessor() {
         body: JSON.stringify({
           cloudinaryUrl: content,
           fileType: file.type
-        })
+        }),
+        signal: abortControllerRef.current?.signal
       });
       
       if (!ingestResponse.ok) {
@@ -198,9 +254,11 @@ export function useNeuralProcessor() {
       }
       
       // Stage 3: ANALYZING
-      setStatus('ANALYZING');
-      setProgress(50);
-      setMessage('Analyzing with Neural Engine...');
+      if (mountedRef.current) {
+        setStatus('ANALYZING');
+        setProgress(50);
+        setMessage('Analyzing with Neural Engine...');
+      }
       updateFileStatus(fileId, { status: 'ANALYZING', progress: 50, message: 'Analyzing content...' });
       
       // Process with local worker
@@ -208,6 +266,8 @@ export function useNeuralProcessor() {
         ingestData.data?.text || content,
         file.type,
         (status, prog, msg) => {
+          if (!mountedRef.current) return;
+          
           const adjustedProgress = 50 + prog * 0.4;
           setProgress(adjustedProgress);
           setMessage(msg);
@@ -220,9 +280,11 @@ export function useNeuralProcessor() {
       );
       
       // Stage 4: COMPLETE
-      setStatus('COMPLETE');
-      setProgress(100);
-      setMessage('Neural processing complete!');
+      if (mountedRef.current) {
+        setStatus('COMPLETE');
+        setProgress(100);
+        setMessage('Neural processing complete!');
+      }
       updateFileStatus(fileId, { 
         status: 'COMPLETE', 
         progress: 100, 
@@ -243,25 +305,37 @@ export function useNeuralProcessor() {
         updateFileStatus(fileId, { learningPath });
       }
       
-      setCurrentFile(prev => prev ? {
-        ...prev,
-        status: 'COMPLETE',
-        progress: 100,
-        result,
-        learningPath
-      } : null);
+      if (mountedRef.current) {
+        setCurrentFile(prev => prev ? {
+          ...prev,
+          status: 'COMPLETE',
+          progress: 100,
+          result,
+          learningPath
+        } : null);
+      }
       
     } catch (err) {
+      // Check if error is due to abort
+      if (err instanceof Error && err.name === 'AbortError') {
+        return;
+      }
+      
       const errorMessage = err instanceof Error ? err.message : 'Processing failed';
-      setStatus('ERROR');
-      setError(errorMessage);
+      if (mountedRef.current) {
+        setStatus('ERROR');
+        setError(errorMessage);
+      }
       updateFileStatus(fileId, { 
         status: 'ERROR', 
         error: errorMessage,
         message: errorMessage
       });
     } finally {
-      setIsProcessing(false);
+      if (mountedRef.current) {
+        setIsProcessing(false);
+      }
+      abortControllerRef.current = null;
     }
   }, [files, updateFileStatus]);
   
@@ -269,12 +343,18 @@ export function useNeuralProcessor() {
    * Cancel current processing
    */
   const cancelProcessing = useCallback(() => {
-    abortControllerRef.current?.abort();
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
     processorRef.current?.terminate();
-    setIsProcessing(false);
-    setStatus('IDLE');
-    setProgress(0);
-    setMessage('');
+    
+    if (mountedRef.current) {
+      setIsProcessing(false);
+      setStatus('IDLE');
+      setProgress(0);
+      setMessage('');
+    }
     
     if (currentFile) {
       updateFileStatus(currentFile.id, { 

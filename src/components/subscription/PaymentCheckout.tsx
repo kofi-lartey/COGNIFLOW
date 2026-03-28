@@ -11,7 +11,7 @@ interface PaymentCheckoutProps {
   currency?: 'NGN' | 'GHS';
 }
 
-// Get user email from mock auth context
+// Get user email from Supabase auth token
 function getUserEmail(): string | undefined {
   if (typeof window === 'undefined') return undefined;
   

@@ -1,6 +1,18 @@
+/**
+ * CogniFlow File Upload Hook
+ * 
+ * Provides file upload functionality to Cloudinary
+ * 
+ * Features:
+ * - React 19 compatible with proper cleanup
+ * - Memory leak prevention through mountedRef
+ * - Progress tracking
+ * - Error handling
+ */
+
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   CLOUDINARY_UPLOAD_URL,
   cloudinaryConfig,
@@ -25,6 +37,20 @@ export interface UseFileUploadReturn {
   reset: () => void;
 }
 
+/**
+ * useFileUpload - File upload hook with React 19 compatibility
+ * 
+ * @example
+ * ```tsx
+ * const { upload, uploadState, reset } = useFileUpload();
+ * 
+ * // Upload a file
+ * const result = await upload(file);
+ * 
+ * // Reset state
+ * reset();
+ * ```
+ */
 export function useFileUpload(): UseFileUploadReturn {
   const [uploadState, setUploadState] = useState<FileUploadState>({
     uploading: false,
@@ -34,29 +60,50 @@ export function useFileUpload(): UseFileUploadReturn {
     publicId: undefined,
   });
 
+  // Ref for mounted state - React 19 compatibility
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  /**
+   * Update state safely (only if mounted)
+   */
+  const safeSetState = useCallback((updater: (prev: FileUploadState) => FileUploadState) => {
+    if (mountedRef.current) {
+      setUploadState(updater);
+    }
+  }, []);
+
   const upload = useCallback(async (
     file: File
   ): Promise<CloudinaryUploadResponse | null> => {
     // Check if Cloudinary is configured
     if (!isCloudinaryConfigured()) {
       const error = new Error('Cloudinary is not configured. Please set up environment variables.');
-      setUploadState({
+      safeSetState(() => ({
         uploading: false,
         progress: 0,
         error,
         url: null,
         publicId: undefined,
-      });
+      }));
       return null;
     }
 
-    setUploadState({
+    safeSetState(() => ({
       uploading: true,
       progress: 0,
       error: null,
       url: null,
       publicId: undefined,
-    });
+    }));
 
     try {
       // Determine resource type from file
@@ -75,6 +122,11 @@ export function useFileUpload(): UseFileUploadReturn {
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
+
+      // Check if still mounted after async operation
+      if (!mountedRef.current) {
+        return null;
+      }
 
       // Create form data for Cloudinary upload
       const formData = new FormData();
@@ -104,6 +156,11 @@ export function useFileUpload(): UseFileUploadReturn {
       // Get response text first to see error details
       const responseText = await response.text();
       
+      // Check if still mounted after async operation
+      if (!mountedRef.current) {
+        return null;
+      }
+      
       if (!response.ok) {
         let errorMessage = 'Cloudinary upload failed';
         try {
@@ -117,16 +174,21 @@ export function useFileUpload(): UseFileUploadReturn {
 
       const data: CloudinaryUploadResponse = JSON.parse(responseText);
 
-      setUploadState({
+      safeSetState(() => ({
         uploading: false,
         progress: 100,
         error: null,
         url: data.secure_url,
         publicId: data.public_id,
-      });
+      }));
 
       return data;
     } catch (error) {
+      // Check if still mounted before updating error state
+      if (!mountedRef.current) {
+        return null;
+      }
+
       const errorMessage = error instanceof Error ? error : new Error('Upload failed');
       console.error('Cloudinary upload error:', errorMessage.message);
       
@@ -144,26 +206,26 @@ export function useFileUpload(): UseFileUploadReturn {
         console.error('The upload should handle this automatically now.');
       }
       
-      setUploadState({
+      safeSetState(() => ({
         uploading: false,
         progress: 0,
         error: errorMessage,
         url: null,
         publicId: undefined,
-      });
+      }));
       return null;
     }
-  }, []);
+  }, [safeSetState]);
 
   const reset = useCallback(() => {
-    setUploadState({
+    safeSetState(() => ({
       uploading: false,
       progress: 0,
       error: null,
       url: null,
       publicId: undefined,
-    });
-  }, []);
+    }));
+  }, [safeSetState]);
 
   return {
     upload,

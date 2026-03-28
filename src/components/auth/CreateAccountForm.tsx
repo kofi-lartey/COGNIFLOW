@@ -47,6 +47,7 @@ export function CreateAccountForm() {
   };
       
   return (
+    <div>
       <div className="text-center mb-10">
         <h1 className="text-4xl font-bold tracking-tight text-text-primary mb-3">
           Create Account
